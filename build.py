@@ -2,54 +2,49 @@
 
 import subprocess
 from typing import Any, Tuple
+import os
 
 import fontforge
 
 VERSION = "v0.0.1"
-FONT_NAME = "BIZTER"
+FONT_NAME = "RobotoNotoJP"
 
 BUILD_TMP = "build_tmp"
 SOURCE_DIR = "source_fonts"
-SOURCE_FONT_JP = "BIZUDPGothic-{}.ttf"
-SOURCE_FONT_EN = "Inter-{}.ttf"
+SOURCE_FONT_JP = "NotoSansJP-{}.ttf"
+SOURCE_FONT_JP_otf = "NotoSansJP-{}.otf"
+SOURCE_FONT_EN = "Roboto-{}.ttf"
 
-EM_ASCENT = 1782
-EM_DESCENT = 266
+EM_ASCENT = 1638
+EM_DESCENT = 410
 
 FONT_ASCENT = EM_ASCENT + 60
 FONT_DESCENT = EM_DESCENT + 170
 
-COPYRIGHT = """[Inter]
-Copyright (c) 2020 The Inter Project Authors (https://github.com/rsms/inter)
+COPYRIGHT = """[Roboto]
+Copyright (c) 2014 The Roboto Project Authors (https://github.com/googlefonts/roboto)
 
-[BIZ UDPGothic]
-Copyright 2022 The BIZ UDGothic Project Authors (https://github.com/googlefonts/morisawa-biz-ud-gothic)
+[NotoSansJP]
+Copyright 2012 Google Inc.
 
-[BIZTER]
-Copyright 2022 Yuko Otawara
+[RobotoNotoJP]
+Copyright 2023 soracat
 """
+
+def open_font_otf(weight) -> Tuple[Any,Any]:
+    jp_font_otf = fontforge.open(f"{SOURCE_DIR}/{SOURCE_FONT_JP_otf.format(weight)}")
+    return jp_font_otf
+
+def otf2ttf(jp_font_otf,weight):
+    jp_font_otf.cidFlatten()
+    jp_font_otf.generate(f"{SOURCE_DIR}/{SOURCE_FONT_JP.format(weight)}")
 
 
 def open_font(weight) -> Tuple[Any, Any]:
     """フォントファイルを開く"""
     jp_font = fontforge.open(f"{SOURCE_DIR}/{SOURCE_FONT_JP.format(weight)}")
-    if weight == "Bold":
-        # 太さを合わせるため、InterはSemiBoldを使う
-        en_font = fontforge.open(f"{SOURCE_DIR}/{SOURCE_FONT_EN.format('Semi'+weight)}")
-    else:
-        en_font = fontforge.open(f"{SOURCE_DIR}/{SOURCE_FONT_EN.format(weight)}")
+    en_font = fontforge.open(f"{SOURCE_DIR}/{SOURCE_FONT_EN.format(weight)}")
     return jp_font, en_font
-
-
-def remove_duplicate_glyphs(jp_font, en_font):
-    """Interと重複しているグリフを削除する"""
-    for g in en_font.glyphs():
-        if not g.isWorthOutputting():
-            continue
-        unicode = int(g.unicode)
-        if unicode >= 0:
-            for g_jp in jp_font.selection.select(unicode).byGlyphs:
-                g_jp.clear()
 
 
 def merge_fonts(jp_font, en_font, weight) -> Any:
@@ -59,9 +54,9 @@ def merge_fonts(jp_font, en_font, weight) -> Any:
     jp_font.em = em_size
     en_font.em = em_size
 
-    en_font.generate(f"{BUILD_TMP}/modified_{SOURCE_FONT_EN.format(weight)}")
-    jp_font.mergeFonts(f"{BUILD_TMP}/modified_{SOURCE_FONT_EN.format(weight)}")
-    return jp_font
+    jp_font.generate(f"{BUILD_TMP}/modified_{SOURCE_FONT_JP.format(weight)}")
+    en_font.mergeFonts(f"{BUILD_TMP}/modified_{SOURCE_FONT_JP.format(weight)}")
+    return en_font
 
 
 def edit_meta_data(font, weight: str):
@@ -95,14 +90,15 @@ def edit_meta_data(font, weight: str):
 
 
 def main():
-    # TODO: tmpフォルダを作って final で削除する
+    if not os.path.exists(f"{BUILD_TMP}"):
+        os.mkdir(f"{BUILD_TMP}")
 
     for weight in ("Regular", "Bold"):
-        jp_font, en_font = open_font(weight)
+        jp_font_otf = open_font_otf(weight)
+        otf2ttf(jp_font_otf,weight)
+        en_font, jp_font = open_font(weight)
 
-        remove_duplicate_glyphs(jp_font, en_font)
-
-        font = merge_fonts(jp_font, en_font, weight)
+        font = merge_fonts(en_font, jp_font, weight)
 
         edit_meta_data(font, weight)
 
