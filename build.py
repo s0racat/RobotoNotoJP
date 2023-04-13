@@ -6,7 +6,7 @@ import os
 
 import fontforge
 
-VERSION = "v0.0.1"
+VERSION = "v0.0.2"
 FONT_NAME = "RobotoNotoJP"
 
 BUILD_TMP = "build_tmp"
