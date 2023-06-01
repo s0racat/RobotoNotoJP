@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
 import subprocess
-from typing import Any, Tuple
 import os
+from typing import Any, Tuple
 
 import fontforge
 
@@ -12,7 +12,6 @@ FONT_NAME = "RobotoNotoJP"
 BUILD_TMP = "build_tmp"
 SOURCE_DIR = "source_fonts"
 SOURCE_FONT_JP = "NotoSansJP-{}.ttf"
-SOURCE_FONT_JP_otf = "NotoSansJP-{}.otf"
 SOURCE_FONT_EN = "Roboto-{}.ttf"
 
 EM_ASCENT = 1638
@@ -31,36 +30,32 @@ Copyright 2012 Google Inc.
 Copyright 2023 soracat
 """
 
-def open_font_otf(weight) -> Tuple[Any,Any]:
-    jp_font_otf = fontforge.open(f"{SOURCE_DIR}/{SOURCE_FONT_JP_otf.format(weight)}")
-    return jp_font_otf
-
-def otf2ttf(jp_font_otf,weight):
-    jp_font_otf.cidFlatten()
-    jp_font_otf.generate(f"{SOURCE_DIR}/{SOURCE_FONT_JP.format(weight)}")
-
-
-def open_font(weight) -> Tuple[Any, Any]:
-    """フォントファイルを開く"""
-    jp_font = fontforge.open(f"{SOURCE_DIR}/{SOURCE_FONT_JP.format(weight)}")
-    en_font = fontforge.open(f"{SOURCE_DIR}/{SOURCE_FONT_EN.format(weight)}")
+def open_font(weight: str) -> Tuple[Any, Any]:
+    jp_font = fontforge.open(os.path.join(SOURCE_DIR, SOURCE_FONT_JP.format(weight)))
+    en_font = fontforge.open(os.path.join(SOURCE_DIR, SOURCE_FONT_EN.format(weight)))
     return jp_font, en_font
 
+def remove_duplicate_glyphs(jp_font, en_font):
+    for g in en_font.glyphs():
+        if not g.isWorthOutputting():
+            continue
+        unicode = int(g.unicode)
+        if unicode >= 0:
+            for g_jp in jp_font.selection.select(unicode).byGlyphs:
+                g_jp.clear()
 
-def merge_fonts(jp_font, en_font, weight) -> Any:
-    """英語フォントと日本語フォントをマージする"""
-    # マージするためにemを揃える
+
+def merge_fonts(jp_font: Any, en_font: Any, weight: str) -> Any:
     em_size = EM_ASCENT + EM_DESCENT
     jp_font.em = em_size
     en_font.em = em_size
 
-    jp_font.generate(f"{BUILD_TMP}/modified_{SOURCE_FONT_JP.format(weight)}")
-    en_font.mergeFonts(f"{BUILD_TMP}/modified_{SOURCE_FONT_JP.format(weight)}")
-    return en_font
+    en_font.generate(os.path.join(BUILD_TMP, f"modified_{SOURCE_FONT_JP.format(weight)}"))
+    jp_font.mergeFonts(os.path.join(BUILD_TMP, f"modified_{SOURCE_FONT_JP.format(weight)}"))
+    return jp_font
 
 
-def edit_meta_data(font, weight: str):
-    """フォント内のメタデータを編集する"""
+def edit_meta_data(font: Any, weight: str):
     font.ascent = EM_ASCENT
     font.descent = EM_DESCENT
     font.os2_typoascent = EM_ASCENT
@@ -90,29 +85,29 @@ def edit_meta_data(font, weight: str):
 
 
 def main():
-    if not os.path.exists(f"{BUILD_TMP}"):
-        os.mkdir(f"{BUILD_TMP}")
+    if not os.path.exists(BUILD_TMP):
+        os.mkdir(BUILD_TMP)
 
     for weight in ("Regular", "Bold"):
-        jp_font_otf = open_font_otf(weight)
-        otf2ttf(jp_font_otf,weight)
-        en_font, jp_font = open_font(weight)
+        jp_font, en_font = open_font(weight)
+        remove_duplicate_glyphs(jp_font,en_font)
 
         font = merge_fonts(en_font, jp_font, weight)
 
         edit_meta_data(font, weight)
 
-        font.generate(f"{BUILD_TMP}/gen_{FONT_NAME}-{weight}.ttf")
+        font.generate(os.path.join(BUILD_TMP, f"gen_{FONT_NAME}-{weight}.ttf"))
 
         subprocess.run(
             (
                 "ttfautohint",
                 "--dehint",
-                f"{BUILD_TMP}/gen_{FONT_NAME}-{weight}.ttf",
-                f"{BUILD_TMP}/{FONT_NAME}-{weight}.ttf",
+                os.path.join(BUILD_TMP, f"gen_{FONT_NAME}-{weight}.ttf"),
+                os.path.join(BUILD_TMP, f"{FONT_NAME}-{weight}.ttf"),
             )
         )
 
 
 if __name__ == "__main__":
     main()
+
